@@ -1,6 +1,7 @@
 """Fuzzer 引擎 — 多线程并发 FUZZ。"""
 
 import concurrent.futures
+import importlib.util
 import random
 import sys
 import time
@@ -11,6 +12,9 @@ from urllib3.exceptions import InsecureRequestWarning
 from .detector import block_reason, identify_waf, is_blocked
 
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+# Optional: curl_cffi for TLS fingerprint impersonation
+_HAS_CURL_CFFI = importlib.util.find_spec("curl_cffi") is not None
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
@@ -59,7 +63,7 @@ class Fuzzer:
     def __init__(self, target_url, method="GET", param="q", data_param="",
                  custom_headers=None, proxy=None, timeout=10, threads=10,
                  delay=0, user_agent_rotate=False, verify_ssl=False,
-                 follow_redirects=False):
+                 follow_redirects=False, impersonate=None):
         self.target_url = target_url.rstrip("?")
         self.method = method.upper()
         self.param = param
@@ -72,6 +76,7 @@ class Fuzzer:
         self.user_agent_rotate = user_agent_rotate
         self.verify_ssl = verify_ssl
         self.follow_redirects = follow_redirects
+        self.impersonate = impersonate  # TLS fingerprint target (e.g. "chrome120")
 
         self.results = []
         self.bypass_count = 0
@@ -80,12 +85,33 @@ class Fuzzer:
         self.waf_identified = []
         self.start_time = None
         self._stop = False
+        # Shared session for connection pooling + cookie persistence
+        self._shared_session = self._create_session()
 
-    def _session(self):
+    def _create_session(self):
+        """Create a shared HTTP session with optional TLS impersonation."""
+        if self.impersonate and _HAS_CURL_CFFI:
+            from curl_cffi.requests import Session
+            s = Session(impersonate=self.impersonate, verify=self.verify_ssl)
+            if self.proxy:
+                s.proxies = {"http": self.proxy, "https": self.proxy}
+            return s
+        if self.impersonate and not _HAS_CURL_CFFI:
+            print("[!] --impersonate requires curl_cffi. Install: pip install curl_cffi")
+            print("[!] Falling back to standard requests (no TLS impersonation).")
         s = requests.Session()
         if self.proxy:
             s.proxies = {"http": self.proxy, "https": self.proxy}
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=10, pool_maxsize=20, max_retries=0
+        )
+        s.mount("http://", adapter)
+        s.mount("https://", adapter)
         return s
+
+    def _session(self):
+        """Return the shared session (connection pooling + cookie jar)."""
+        return self._shared_session
 
     def _headers(self):
         hdrs = dict(self.custom_headers)

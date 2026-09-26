@@ -138,6 +138,8 @@ def main():
                         help="跳过 SSL 证书验证")
     parser.add_argument("--follow-redirects", action="store_true",
                         help="跟随重定向（默认不跟随）")
+    parser.add_argument("--impersonate", metavar="TARGET", nargs="?", const="chrome120",
+                        help="TLS 指纹伪装（需 curl_cffi）。目标：chrome120/chrome131/safari17_0/firefox135 等")
     parser.add_argument("-o", "--output",
                         help="输出文件路径 (.json / .csv)")
     parser.add_argument("--html-report",
@@ -225,6 +227,7 @@ def main():
         user_agent_rotate=args.user_agent_rotate,
         verify_ssl=not args.no_verify,
         follow_redirects=args.follow_redirects,
+        impersonate=args.impersonate,
     )
 
     start = time.time()
