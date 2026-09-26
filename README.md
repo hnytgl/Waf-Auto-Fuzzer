@@ -6,9 +6,11 @@
 
 - **17 类攻击 payload** — SQLi, XSS, 命令注入, 路径穿越, SSRF, RCE, XXE, SSTI, LDAP, Open Redirect 等
 - **49 种编码/变形** — URL 系列(8种), HTML实体(3种), Unicode(4种), Base64(2种), 大小写混淆(5种), 注释注入(8种), 空白变形(7种), 空字节(2种), 字符串连接(3种), Hex(2种), Shell通配符(2种), 其他(3种)
+- **TLS 指纹伪装** — `--impersonate chrome120` 模拟浏览器 JA3/JA4 指纹，绕过 Cloudflare/Akamai/DataDome 的 TLS 层拦截（需 curl_cffi）
+- **Session 连接池** — 共享 HTTP Session，连接复用 + Cookie 持久化（cf_clearance 等 challenge cookie 跨请求保持）
 - **多 HTTP 方法** — GET, POST, PUT, Cookie 注入, Header 注入
 - **并发 FUZZ** — 多线程快速扫描
-- **WAF 指纹识别** — 自动识别 Cloudflare, ModSecurity, AWS WAF, F5, Akamai, Imperva, Sucuri 等 15+ 种 WAF
+- **WAF 指纹识别** — 自动识别 **35 种** WAF（Cloudflare, Akamai, AWS, Azure, F5, Imperva, Sucuri, 腾讯云, 华为云, 奇安信, 绿盟, 山石, 安恒, 启明星辰, 天融信, 火山引擎, 加速乐, 云盾, 百度云, SafeDog, DataDome, PerimeterX, Kasada, Reblaze, Wallarm, Zscaler 等）
 - **结果输出** — JSON / CSV / HTML 报告
 - **绕过脚本生成** — 自动生成可复用的 Python 绕过脚本
 - **代理支持** — 支持 Burp Suite 等中间人代理
@@ -18,6 +20,9 @@
 
 ```bash
 pip install -r requirements.txt
+
+# 可选：TLS 指纹伪装支持
+pip install curl_cffi
 ```
 
 ## 快速开始
@@ -25,6 +30,9 @@ pip install -r requirements.txt
 ```bash
 # 基本用法：GET 参数 fuzz
 python waf_fuzz.py -t "http://target.com/search?q=" -p q
+
+# TLS 指纹伪装绕过 Cloudflare
+python waf_fuzz.py -t "https://target.com/search?q=" -p q --impersonate chrome120
 
 # POST 表单 fuzz
 python waf_fuzz.py -t "http://target.com/login" -m POST -p username
@@ -69,6 +77,7 @@ python waf_fuzz.py -t "http://target.com" -p q -o result.json --html-report repo
 | `--user-agent-rotate` | — | 轮换 UA |
 | `--no-verify` | — | 跳过 SSL 验证 |
 | `--follow-redirects` | — | 跟随重定向 |
+| `--impersonate` | — | TLS 指纹伪装目标（chrome120/safari17_0/firefox135 等，需 curl_cffi） |
 | `-o, --output` | — | 输出文件 (.json/.csv) |
 | `--html-report` | — | HTML 报告路径 |
 | `--bypass-report` | — | 绕过摘要报告路径 |
